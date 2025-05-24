@@ -91,10 +91,6 @@ class HashTable:
             result.extend([value for _, value in bucket.get_all_key_value_pairs()])
         return result
 
-# =============================
-# Book class để lưu trong bảng băm
-# =============================
-
 class Book:
     def __init__(self, isbn, title, author, year, quantity):
         self.isbn = isbn
@@ -123,14 +119,12 @@ def create_book_tab(notebook, conn):
 
     book_table = HashTable()
 
-    # Load sách từ CSDL vào bảng băm
     cursor = conn.cursor()
     for row in cursor.execute("SELECT * FROM books"):
         book = Book(*row[:5])
         book.available_quantity = row[5]
         book_table.insert(book.isbn, book)
 
-    # Nhãn và ô nhập
     labels = ["ISBN", "Tiêu đề", "Tác giả", "Năm", "Số lượng"]
     entries = {}
     for i, label in enumerate(labels):
@@ -139,15 +133,13 @@ def create_book_tab(notebook, conn):
         entry.grid(row=i, column=1, padx=5, pady=5, sticky="w")
         entries[label] = entry
 
-    # Hiển thị danh sách sách
     tree = ttk.Treeview(tab, columns=("ISBN", "Tiêu đề", "Tác giả", "Năm", "SL", "Còn"), show="headings")
     for col in tree["columns"]:
         tree.heading(col, text=col)
-    tree.grid(row=0, column=2, rowspan=10, padx=10, pady=5)
+    tree.grid(row=0, column=2, rowspan=15, padx=10, pady=5)
 
     def refresh_tree():
-        for row in tree.get_children():
-            tree.delete(row)
+        tree.delete(*tree.get_children())
         for book in book_table.get_all_values():
             tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
 
@@ -168,10 +160,7 @@ def create_book_tab(notebook, conn):
 
         book = Book(isbn, title, author, year, quantity)
         book_table.insert(isbn, book)
-
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO books VALUES (?, ?, ?, ?, ?, ?)",
-                       (isbn, title, author, year, quantity, quantity))
+        cursor.execute("INSERT INTO books VALUES (?, ?, ?, ?, ?, ?)", (isbn, title, author, year, quantity, quantity))
         conn.commit()
         messagebox.showinfo("Thành công", "Đã thêm sách")
         refresh_tree()
@@ -183,7 +172,6 @@ def create_book_tab(notebook, conn):
         isbn = tree.item(selected[0])["values"][0]
         if book_table.search(isbn):
             book_table.delete(isbn)
-        cursor = conn.cursor()
         cursor.execute("DELETE FROM books WHERE isbn = ?", (isbn,))
         conn.commit()
         refresh_tree()
@@ -216,7 +204,6 @@ def create_book_tab(notebook, conn):
         book.available_quantity += diff
         book_table.insert(isbn, book)
 
-        cursor = conn.cursor()
         cursor.execute("UPDATE books SET title=?, author=?, year=?, quantity=?, available_quantity=? WHERE isbn=?",
                        (title, author, year, quantity, book.available_quantity, isbn))
         conn.commit()
@@ -230,6 +217,58 @@ def create_book_tab(notebook, conn):
                 entries[key].delete(0, tk.END)
                 entries[key].insert(0, values[i])
 
+    def search_books(table):
+        keyword = search_entry.get().strip().lower()
+        mode = search_type.get()
+        result = []
+        for book in table.get_all_values():
+            if mode == "ISBN" and keyword in book.isbn.lower():
+                result.append(book)
+            elif mode == "Tiêu đề" and keyword in book.title.lower():
+                result.append(book)
+            elif mode == "Tác giả" and keyword in book.author.lower():
+                result.append(book)
+
+        tree.delete(*tree.get_children())
+        for book in result:
+            tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
+
+    def sort_books(table):
+        books = table.get_all_values()
+        mode = sort_type.get()
+
+        def compare(book):
+            return book.title.lower() if mode == "Tiêu đề (A-Z)" else book.isbn
+
+        def merge_sort(arr):
+            if len(arr) <= 1:
+                return arr
+            mid = len(arr) // 2
+            left = merge_sort(arr[:mid])
+            right = merge_sort(arr[mid:])
+            return merge(left, right)
+
+        def merge(left, right):
+            result = []
+            i = j = 0
+            while i < len(left) and j < len(right):
+                if compare(left[i]) <= compare(right[j]):
+                    result.append(left[i])
+                    i += 1
+                else:
+                    result.append(right[j])
+                    j += 1
+            result.extend(left[i:])
+            result.extend(right[j:])
+            return result
+
+        sorted_books = merge_sort(books)
+
+        tree.delete(*tree.get_children())
+        for book in sorted_books:
+            tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
+
+
     def export_to_csv():
         with open("books_export.csv", "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -238,12 +277,27 @@ def create_book_tab(notebook, conn):
                 writer.writerow([book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity])
         messagebox.showinfo("Xuất CSV", "Đã lưu file books_export.csv")
 
-    # Nút chức năng
-    tk.Button(tab, text="Thêm", command=add_book).grid(row=6, column=0, pady=10)
-    tk.Button(tab, text="Xóa", command=delete_book).grid(row=6, column=1)
-    tk.Button(tab, text="Cập nhật", command=update_book).grid(row=6, column=2)
-    tk.Button(tab, text="Xuất CSV", command=export_to_csv).grid(row=7, column=0, columnspan=2)
+    tk.Button(tab, text="Thêm", command=add_book).grid(row=6, column=0, pady = 10)
+    tk.Button(tab, text="Xóa", command=delete_book).grid(row=6, column=0, padx = 5, columnspan = 2 )
+    tk.Button(tab, text="Cập nhật", command=update_book).grid(row=11, column=2, sticky="e", padx = 400)
+    tk.Button(tab, text="Xuất CSV", command=export_to_csv).grid(row=6, column=1, pady=10, padx=15, sticky="e")
+
+    # Tìm kiếm
+    tk.Label(tab, text="Tìm theo:").grid(row=8, column=0, sticky="e", padx=5, pady = 5)
+    search_type = ttk.Combobox(tab, values=["ISBN", "Tiêu đề", "Tác giả"])
+    search_type.set("Tiêu đề")
+    search_type.grid(row=8, column=1, pady= 5, sticky="w")
+    tk.Label(tab, text="Tìm theo:").grid(row=9, column=0, sticky="e", padx=5, pady = 5)
+    search_entry = tk.Entry(tab)
+    search_entry.grid(row=9, column=1, pady = 5, sticky="w")
+    tk.Button(tab, text="Tìm kiếm", command=lambda: search_books(book_table)).grid(row=11, column=2, padx= 400, sticky="w")
+
+    # Sắp xếp
+    tk.Label(tab, text="Sắp xếp theo:").grid(row=10, column=0, sticky="e", padx=5, pady=5)
+    sort_type = ttk.Combobox(tab, values=["Tiêu đề (A-Z)", "ISBN (tăng dần)"])
+    sort_type.set("Tiêu đề (A-Z)")
+    sort_type.grid(row=10, column=1, pady= 5, sticky="w")
+    tk.Button(tab, text="Sắp xếp", command=lambda: sort_books(book_table)).grid(row=11, column=2, padx=0, sticky="s")
 
     tree.bind("<ButtonRelease-1>", load_selected_book)
-
     refresh_tree()
