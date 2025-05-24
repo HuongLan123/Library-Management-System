@@ -236,9 +236,19 @@ def create_book_tab(notebook, conn):
     def sort_books(table):
         books = table.get_all_values()
         mode = sort_type.get()
-
-        def compare(book):
-            return book.title.lower() if mode == "Tiêu đề (A-Z)" else book.isbn
+        reverse = False
+        if mode == "Tiêu đề (A-Z)":
+            key_func = lambda book: book.title.lower()
+        elif mode == "Tiêu đề (Z-A)":
+            key_func = lambda book: book.title.lower()
+            reverse = True
+        elif mode == "ISBN (tăng dần)":
+            key_func = lambda book: book.isbn
+        elif mode == "ISBN (giảm dần)":
+            key_func = lambda book: book.isbn
+            reverse = True
+        else:
+            key_func = lambda book: book.title.lower()  # fallback
 
         def merge_sort(arr):
             if len(arr) <= 1:
@@ -252,7 +262,7 @@ def create_book_tab(notebook, conn):
             result = []
             i = j = 0
             while i < len(left) and j < len(right):
-                if compare(left[i]) <= compare(right[j]):
+                if (key_func(left[i]) <= key_func(right[j])) ^ reverse:
                     result.append(left[i])
                     i += 1
                 else:
@@ -263,7 +273,6 @@ def create_book_tab(notebook, conn):
             return result
 
         sorted_books = merge_sort(books)
-
         tree.delete(*tree.get_children())
         for book in sorted_books:
             tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
@@ -294,9 +303,9 @@ def create_book_tab(notebook, conn):
 
     # Sắp xếp
     tk.Label(tab, text="Sắp xếp theo:").grid(row=10, column=0, sticky="e", padx=5, pady=5)
-    sort_type = ttk.Combobox(tab, values=["Tiêu đề (A-Z)", "ISBN (tăng dần)"])
+    sort_type = ttk.Combobox(tab, values=["Tiêu đề (A-Z)", "Tiêu đề (Z-A)", "ISBN (tăng dần)", "ISBN (giảm dần)"])
     sort_type.set("Tiêu đề (A-Z)")
-    sort_type.grid(row=10, column=1, pady= 5, sticky="w")
+    sort_type.grid(row=10, column=1, pady= 5,sticky="w")
     tk.Button(tab, text="Sắp xếp", command=lambda: sort_books(book_table)).grid(row=11, column=2, padx=0, sticky="s")
 
     tree.bind("<ButtonRelease-1>", load_selected_book)
