@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime # Cho các thao tác ngày tháng
 import sqlite3
-conn = sqlite3.connect("library3.db") # Kết nối CSDL SQLite
+db_connection = sqlite3.connect("library3.db") # Kết nối CSDL SQLite
 # ==============================================================================
 # IMPORT CÁC LỚP CTDL TỰ CÀI ĐẶT VÀ ĐỐI TƯỢNG
 # ==============================================================================
@@ -143,10 +143,10 @@ def create_statistics_tab(notebook, db_connection):
                 try:
                     loan_id_from_db = int(row[0])
                     if loan_id_from_db > max_loan_id_db: max_loan_id_db = loan_id_from_db
-
-                    borrow_date_obj = datetime.datetime.strptime(row[3], "%Y-%m-%d").date() if row[3] else None
-                    due_date_obj = datetime.datetime.strptime(row[4], "%Y-%m-%d").date() if row[4] else None
-                    return_date_obj = datetime.datetime.strptime(row[5], "%Y-%m-%d").date() if row[5] else None
+                    #date.strftime("%Y-%m-%d %H:%M:%S.%f")
+                    borrow_date_obj = datetime.datetime.strptime(row[3], "%Y-%m-%d %H:%M:%S.%f").date() if row[3] else None
+                    due_date_obj = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S.%f").date() if row[4] else None
+                    return_date_obj = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S.%f").date() if row[5] else None
                     
                     if borrow_date_obj and due_date_obj: # Ngày mượn và hạn trả là bắt buộc
                         # Tạo LoanRecord với loan_id từ CSDL
@@ -182,7 +182,7 @@ def create_statistics_tab(notebook, db_connection):
     def display_top_n_books_command():
         clear_output_area_command()
         # Kiểm tra xem đã nạp dữ liệu chưa
-        if ht_books_stats.get_current_size() == 0 and not loan_manager_stats.bst.inorder():
+        if ht_books_stats.size == 0 and not loan_manager_stats.bst.inorder():
             messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
             return
         n_top = 10
@@ -204,7 +204,7 @@ def create_statistics_tab(notebook, db_connection):
 
     def display_top_n_readers_command():
         clear_output_area_command()
-        if ht_readers_stats.get_current_size() == 0 and not loan_manager_stats.bst.inorder():
+        if ht_readers_stats.size == 0 and not loan_manager_stats.bst.inorder():
             messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
             return
         n_top = 10
@@ -226,10 +226,10 @@ def create_statistics_tab(notebook, db_connection):
     
     def display_total_books_stats_command():
         clear_output_area_command()
-        if ht_books_stats.get_current_size() == 0:
+        if ht_books_stats.size == 0:
              messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
              return
-        num_titles = ht_books_stats.get_current_size()
+        num_titles = ht_books_stats.size
         all_book_objects = ht_books_stats.get_all_values()
         total_copies = sum(book.quantity for book in all_book_objects if book) if all_book_objects else 0
         output_text_area.insert(tk.END, "--- Thống Kê Tổng Số Sách ---\n")
@@ -238,10 +238,10 @@ def create_statistics_tab(notebook, db_connection):
 
     def display_total_readers_stats_command():
         clear_output_area_command()
-        if ht_readers_stats.get_current_size() == 0:
+        if ht_readers_stats.size== 0:
              messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
              return
-        count = ht_readers_stats.get_current_size()
+        count = ht_readers_stats.size
         output_text_area.insert(tk.END, "--- Thống Kê Tổng Số Bạn Đọc ---\n")
         output_text_area.insert(tk.END, f"Tổng số bạn đọc đã đăng ký: {count}\n")
 
