@@ -16,17 +16,22 @@ class LoanRecord:
         self.reader_id = reader_id
         self.isbn = isbn
         # Đảm bảo borrow_date và due_date là đối tượng datetime
+        # Sử dụng format chuẩn cho SQLite datetime strings
         if isinstance(borrow_date, str):
+            # CẬP NHẬT: Thêm %f để xử lý micro giây
             self.borrow_date = datetime.strptime(borrow_date, "%Y-%m-%d %H:%M:%S.%f")
         else:
             self.borrow_date = borrow_date
 
         if isinstance(due_date, str):
+            # CẬP NHẬT: Thêm %f để xử lý micro giây
             self.due_date = datetime.strptime(due_date, "%Y-%m-%d %H:%M:%S.%f")
         else:
             self.due_date = due_date
 
+        # return_date có thể là None
         if isinstance(return_date, str) and return_date:
+            # CẬP NHẬT: Thêm %f để xử lý micro giây
             self.return_date = datetime.strptime(return_date, "%Y-%m-%d %H:%M:%S.%f")
         else:
             self.return_date = return_date
@@ -47,7 +52,11 @@ class LoanBST:
         self.root = None
 
     def insert(self, record):
+        # Ensure key is unique, if not, handle collision (e.g., update or log)
+        # If the record already exists based on loan_id, update it.
+        # Otherwise, insert a new node.
         self.root = self._insert(self.root, record.loan_id, record)
+
 
     def _insert(self, node, key, record):
         if node is None:
@@ -55,8 +64,12 @@ class LoanBST:
 
         if key < node.key:
             node.left = self._insert(node.left, key, record)
-        else:
+        elif key > node.key:
             node.right = self._insert(node.right, key, record)
+        else:
+            # If key already exists, update the record (important for DB sync)
+            node.record = record
+            return node
 
         node.height = 1 + max(self._get_height(node.left), self._get_height(node.right))
         balance = self._get_balance(node)
@@ -134,31 +147,12 @@ class LoanManager:
         self.bst = LoanBST()
         self.loan_id_counter = 1
         self.db_name = db_name
+        self._initialize_db_table() # Đảm bảo bảng tồn tại trước khi tải
         self.load_loans_from_db() # Tải dữ liệu khi khởi tạo
 
-    def save_loans_to_db(self):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor() # Xóa dữ liệu cũ để tránh trùng lặp
-        for record in self.bst.inorder():
-            cursor.execute('''
-                INSERT INTO loans (loan_id, reader_id, isbn, borrow_date, due_date, return_date, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                record.loan_id,
-                record.reader_id,
-                record.isbn,
-                record.borrow_date.strftime("%Y-%m-%d %H:%M:%S.%f"),
-                record.due_date.strftime("%Y-%m-%d %H:%M:%S.%f"),
-                record.return_date.strftime("%Y-%m-%d %H:%M:%S.%f") if record.return_date else None,
-                record.status
-            ))
-        conn.commit()
-        conn.close()
-
-    def load_loans_from_db(self):
+    def _initialize_db_table(self):
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
-        # Đảm bảo bảng được tạo nếu chưa tồn tại (mặc dù bạn nói đã có ở home.py)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS loans (
                 loan_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,14 +164,53 @@ class LoanManager:
                 status TEXT
             )
         ''')
+        conn.commit()
+        conn.close()
+
+    def save_loans_to_db(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        # Xóa tất cả dữ liệu cũ và chèn lại để đảm bảo đồng bộ
+        cursor.execute("DELETE FROM loans")
+        for record in self.bst.inorder():
+            cursor.execute('''
+                INSERT INTO loans (loan_id, reader_id, isbn, borrow_date, due_date, return_date, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                record.loan_id,
+                record.reader_id,
+                record.isbn,
+                # CẬP NHẬT: Thêm %f khi lưu vào DB
+                record.borrow_date.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                record.due_date.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                record.return_date.strftime("%Y-%m-%d %H:%M:%S.%f") if record.return_date else None,
+                record.status
+            ))
+        conn.commit()
+        conn.close()
+
+    def load_loans_from_db(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM loans")
         rows = cursor.fetchall()
+        # Reset BST before loading to prevent duplicates if called multiple times
+        self.bst = LoanBST()
         for row in rows:
             loan_id, reader_id, isbn, borrow_date_str, due_date_str, return_date_str, status = row
             # Chuyển đổi chuỗi ngày thành đối tượng datetime
-            borrow_date = datetime.strptime(borrow_date_str, "%Y-%m-%d %H:%M:%S.%f")
-            due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M:%S.%f")
-            return_date = datetime.strptime(return_date_str, "%Y-%m-%d %H:%M:%S.%f") if return_date_str else None
+            try:
+                # CẬP NHẬT: Thêm %f để xử lý micro giây khi đọc từ DB
+                borrow_date = datetime.strptime(borrow_date_str, "%Y-%m-%d %H:%M:%S.%f")
+                due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M:%S.%f")
+                return_date = datetime.strptime(return_date_str, "%Y-%m-%d %H:%M:%S.%f") if return_date_str else None
+            except ValueError:
+                # Fallback for old data without microseconds (e.g., if you had data before this fix)
+                # You might need to refine this based on your exact data consistency.
+                borrow_date = datetime.strptime(borrow_date_str, "%Y-%m-%d %H:%M:%S")
+                due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M:%S")
+                return_date = datetime.strptime(return_date_str, "%Y-%m-%d %H:%M:%S") if return_date_str else None
+                print(f"Warning: Loaded loan {loan_id} with old datetime format. Consider re-saving to update format.")
             
             record = LoanRecord(loan_id, reader_id, isbn, borrow_date, due_date, return_date, status)
             self.bst.insert(record)
@@ -201,18 +234,20 @@ class LoanManager:
         print(f"Tạo phiếu mượn thành công: Loan ID = {self.loan_id_counter}")
         self.loan_id_counter += 1
 
-    def return_book(self, reader_id, isbn):
-        found = False
-        for record in self.bst.inorder():
-            if record.reader_id == reader_id and record.isbn == isbn and record.status == "Đang mượn":
-                record.return_date = datetime.now()
-                record.status = "Đã trả"
-                self.save_loans_to_db() # Lưu vào DB sau khi trả
-                print("Trả sách thành công")
-                found = True
-                break
-        if not found:
-            print("Không tìm thấy phiếu mượn hợp lệ để trả")
+    def return_book(self, loan_id):
+        record = self.bst.search_by_loan_id(loan_id)
+        if record and record.status == "Đang mượn":
+            record.return_date = datetime.now()
+            record.status = "Đã trả"
+            # Since the BST's node.record is a direct reference,
+            # updating it directly means the BST 'contains' the updated record.
+            # Now, just resave the entire BST to the DB.
+            self.save_loans_to_db()
+            print(f"Trả sách thành công cho phiếu mượn {loan_id}")
+            return True
+        else:
+            print(f"Không tìm thấy phiếu mượn hợp lệ (ID: {loan_id}) để trả hoặc đã được trả.")
+            return False
 
     def show_current_loans(self, reader_id):
         found = False
@@ -251,6 +286,7 @@ class LoanManager:
                 found = True
         if not found:
             print("Chưa có lịch sử mượn cho quyển sách này")
+    
     def count_loans_by_isbn(self):
         stats = {}
         for record in self.bst.inorder():
@@ -300,9 +336,10 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
     def refresh_tree():
         tree.delete(*tree.get_children())
         for record in loan_manager.bst.inorder():
-            borrow = record.borrow_date.strftime("%Y-%m-%d")
-            due = record.due_date.strftime("%Y-%m-%d")
-            ret = record.return_date.strftime("%Y-%m-%d") if record.return_date else ""
+            # CẬP NHẬT: Thêm %f khi hiển thị trên Treeview
+            borrow = record.borrow_date.strftime("%Y-%m-%d %H:%M:%S.%f")
+            due = record.due_date.strftime("%Y-%m-%d %H:%M:%S.%f")
+            ret = record.return_date.strftime("%Y-%m-%d %H:%M:%S.%f") if record.return_date else ""
             tree.insert("", "end", values=(
                 record.loan_id,
                 record.reader_id,
@@ -326,20 +363,25 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
         loan_manager.create_loan(reader_id, isbn, days)
         refresh_tree()
         messagebox.showinfo("Thành công", f"Đã tạo phiếu mượn cho bạn đọc {reader_id}")
+        # Clear entries after successful creation
+        entries["Mã bạn đọc"].delete(0, tk.END)
+        entries["ISBN"].delete(0, tk.END)
+        entries["Số ngày mượn (mặc định 30)"].delete(0, tk.END)
 
     def return_book():
         selected = tree.selection()
         if not selected:
             messagebox.showwarning("Thông báo", "Vui lòng chọn phiếu mượn để trả sách.")
             return
+        
+        # Lấy loan_id từ hàng được chọn
         loan_id = tree.item(selected[0])["values"][0]
-        record = loan_manager.bst.search_by_loan_id(loan_id)
-        if record and record.status == "Đang mượn":
-            loan_manager.return_book(record.reader_id, record.isbn)
+        
+        if loan_manager.return_book(loan_id):
             refresh_tree()
             messagebox.showinfo("Trả sách", f"Phiếu #{loan_id} đã trả sách")
         else:
-            messagebox.showwarning("Thông báo", "Phiếu mượn này đã được trả hoặc không hợp lệ.")
+            messagebox.showwarning("Thông báo", f"Không thể trả sách cho phiếu #{loan_id}. Có thể phiếu đã được trả hoặc không tồn tại.")
 
     def search_loan_history_by_reader():
         output_text.delete("1.0", tk.END)
@@ -347,9 +389,14 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
         if not reader_id:
             messagebox.showwarning("Lỗi", "Nhập mã bạn đọc để tìm kiếm lịch sử mượn.")
             return
-        loan_ids = loan_manager.get_loan_history_by_reader(reader_id)
-        if loan_ids:
-            output_text.insert(tk.END, f"Lịch sử mượn của bạn đọc {reader_id}:\n{loan_ids}\n")
+        
+        found_records = [rec for rec in loan_manager.bst.inorder() if rec.reader_id == reader_id]
+        if found_records:
+            output_text.insert(tk.END, f"Lịch sử mượn của bạn đọc {reader_id}:\n")
+            for record in found_records:
+                borrow_date = record.borrow_date.strftime("%Y-%m-%d %H:%M:%S.%f") # CẬP NHẬT: Thêm %f
+                return_date = record.return_date.strftime("%Y-%m-%d %H:%M:%S.%f") if record.return_date else "Chưa trả" # CẬP NHẬT: Thêm %f
+                output_text.insert(tk.END, f"  Loan ID: {record.loan_id}, ISBN: {record.isbn}, Ngày mượn: {borrow_date}, Ngày trả: {return_date}, Trạng thái: {record.status}\n")
         else:
             output_text.insert(tk.END, "Không có lịch sử mượn\n")
 
@@ -359,15 +406,15 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
         if not isbn:
             messagebox.showwarning("Lỗi", "Nhập ISBN để tìm kiếm lịch sử mượn.")
             return
-        # Chuyển sang ghi kết quả vào output_text
-        found = False
-        for record in loan_manager.bst.inorder():
-            if record.isbn == isbn:
-                borrow_date = record.borrow_date.strftime("%Y-%m-%d")
-                return_date = record.return_date.strftime("%Y-%m-%d") if record.return_date else "Chưa trả"
-                output_text.insert(tk.END, f"Loan ID: {record.loan_id}, Bạn đọc: {record.reader_id}, Ngày mượn: {borrow_date}, Ngày trả: {return_date}\n")
-                found = True
-        if not found:
+        
+        found_records = [rec for rec in loan_manager.bst.inorder() if rec.isbn == isbn]
+        if found_records:
+            output_text.insert(tk.END, f"Lịch sử mượn của sách ISBN '{isbn}':\n")
+            for record in found_records:
+                borrow_date = record.borrow_date.strftime("%Y-%m-%d %H:%M:%S.%f") # CẬP NHẬT: Thêm %f
+                return_date = record.return_date.strftime("%Y-%m-%d %H:%M:%S.%f") if record.return_date else "Chưa trả" # CẬP NHẬT: Thêm %f
+                output_text.insert(tk.END, f"  Loan ID: {record.loan_id}, Bạn đọc: {record.reader_id}, Ngày mượn: {borrow_date}, Ngày trả: {return_date}, Trạng thái: {record.status}\n")
+        else:
             output_text.insert(tk.END, "Chưa có lịch sử mượn cho quyển sách này\n")
 
     def show_current_loans_by_reader():
@@ -379,7 +426,7 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
         found = False
         for record in loan_manager.bst.inorder():
             if record.reader_id == reader_id and record.status == "Đang mượn":
-                due = record.due_date.strftime("%Y-%m-%d")
+                due = record.due_date.strftime("%Y-%m-%d %H:%M:%S.%f") # CẬP NHẬT: Thêm %f
                 output_text.insert(tk.END, f"Loan ID: {record.loan_id}, ISBN: {record.isbn}, Hạn trả: {due}\n")
                 found = True
         if not found:
@@ -387,11 +434,11 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
 
     def show_overdue_loans():
         output_text.delete("1.0", tk.END)
-        check_date = datetime(2025,7,10).date()
+        check_date = datetime.now().date() # Sử dụng ngày hiện tại
         found = False
         for record in loan_manager.bst.inorder():
             if record.status == "Đang mượn" and record.due_date.date() < check_date:
-                due = record.due_date.strftime("%Y-%m-%d")
+                due = record.due_date.strftime("%Y-%m-%d %H:%M:%S.%f") # CẬP NHẬT: Thêm %f
                 output_text.insert(tk.END, f"Loan ID: {record.loan_id}, Bạn đọc: {record.reader_id}, ISBN: {record.isbn}, Hạn trả: {due}\n")
                 found = True
         if not found:
@@ -403,7 +450,7 @@ def create_loan_tab(notebook, loan_manager: LoanManager):
         if stats:
             output_text.insert(tk.END, "Thống kê mượn/trả theo ISBN:\n")
             for isbn, counts in stats.items():
-                output_text.insert(tk.END, f"ISBN: {isbn} | Đang mượn: {counts['Đang mượn']} | Đã trả: {counts['Đã trả']}\n")
+                output_text.insert(tk.END, f"ISBN: {isbn} | Đang mượn: {counts.get('Đang mượn', 0)} | Đã trả: {counts.get('Đã trả', 0)}\n")
         else:
             output_text.insert(tk.END, "Chưa có dữ liệu mượn sách.\n")
 
