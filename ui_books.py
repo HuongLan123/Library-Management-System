@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import font
 import sqlite3
 import csv
 
@@ -115,7 +116,7 @@ class Book:
 
 def create_book_tab(notebook, conn):
     tab = ttk.Frame(notebook)
-    notebook.add(tab, text="Quản lý Sách")
+    notebook.add(tab, text="📚 Quản lý Sách")
 
     book_table = HashTable()
 
@@ -130,13 +131,43 @@ def create_book_tab(notebook, conn):
     for i, label in enumerate(labels):
         tk.Label(tab, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="e")
         entry = tk.Entry(tab)
-        entry.grid(row=i, column=1, padx=5, pady=5, sticky="w")
+        entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew") # Changed sticky to "ew" for entries
         entries[label] = entry
 
     tree = ttk.Treeview(tab, columns=("ISBN", "Tiêu đề", "Tác giả", "Năm", "SL", "Còn"), show="headings")
     for col in tree["columns"]:
-        tree.heading(col, text=col)
-    tree.grid(row=0, column=2, rowspan=15, padx=10, pady=5)
+        tree.heading(col, text=col, anchor="center")
+        # Set a minimum width for columns to prevent them from becoming too narrow
+        tree.column(col, width=tk.font.Font().measure(col) + 20, minwidth=50, stretch=True) # Added minwidth and stretch
+    
+    # Configure the column where the treeview is placed to expand horizontally
+    tab.grid_columnconfigure(2, weight=1) # The treeview is in column 2
+    
+    tree.grid(row=0, column=2, rowspan=15, padx=15, pady=5, sticky="nsew") # Adjusted rowspan and row to 0 to align with top
+    
+    # Add scrollbar to the Treeview
+    scrollbar_y = ttk.Scrollbar(tab, orient="vertical", command=tree.yview)
+    scrollbar_y.grid(row=0, column=3, rowspan=15, sticky="ns")
+    tree.configure(yscrollcommand=scrollbar_y.set)
+
+    scrollbar_x = ttk.Scrollbar(tab, orient="horizontal", command=tree.xview)
+    scrollbar_x.grid(row=15, column=2, sticky="ew") # Placed scrollbar_x in a new row below the treeview
+    tree.configure(xscrollcommand=scrollbar_x.set)
+
+    def reload_from_database():
+        # Xóa toàn bộ dữ liệu trong bảng băm
+        for i in range(book_table.capacity):
+            book_table.table[i] = LinkedListForHash()
+        book_table.size = 0
+
+        # Truy vấn lại dữ liệu từ SQLite và chèn vào bảng băm
+        for row in cursor.execute("SELECT * FROM books"):
+            book = Book(*row[:5])
+            book.available_quantity = row[5]
+            book_table.insert(book.isbn, book)
+
+        # Cập nhật lại Treeview
+        refresh_tree()
 
     def refresh_tree():
         tree.delete(*tree.get_children())
@@ -168,6 +199,7 @@ def create_book_tab(notebook, conn):
     def delete_book():
         selected = tree.selection()
         if not selected:
+            messagebox.showerror("Lỗi", "Vui lòng chọn sách để xóa.")
             return
         isbn = tree.item(selected[0])["values"][0]
         if book_table.search(isbn):
@@ -175,6 +207,7 @@ def create_book_tab(notebook, conn):
         cursor.execute("DELETE FROM books WHERE isbn = ?", (isbn,))
         conn.commit()
         refresh_tree()
+        messagebox.showinfo("Thành công", "Đã xóa sách")
 
     def update_book():
         selected = tree.selection()
@@ -190,7 +223,6 @@ def create_book_tab(notebook, conn):
         except ValueError:
             messagebox.showerror("Lỗi", "Năm và Số lượng phải là số")
             return
-
         book = book_table.search(isbn)
         if not book:
             messagebox.showerror("Lỗi", "Không tìm thấy sách để cập nhật")
@@ -202,13 +234,14 @@ def create_book_tab(notebook, conn):
         book.year = year
         book.quantity = quantity
         book.available_quantity += diff
-        book_table.insert(isbn, book)
+        book_table.insert(isbn, book) # Re-insert to update in hash table if key is the same
 
         cursor.execute("UPDATE books SET title=?, author=?, year=?, quantity=?, available_quantity=? WHERE isbn=?",
                        (title, author, year, quantity, book.available_quantity, isbn))
         conn.commit()
         refresh_tree()
-
+        messagebox.showinfo("Thành công", "Đã cập nhật sách")
+    
     def load_selected_book(event):
         selected = tree.selection()
         if selected:
@@ -248,7 +281,7 @@ def create_book_tab(notebook, conn):
             key_func = lambda book: book.isbn
             reverse = True
         else:
-            key_func = lambda book: book.title.lower()  # fallback
+            key_func = lambda book: book.title.lower()   # fallback
 
         def merge_sort(arr):
             if len(arr) <= 1:
@@ -264,10 +297,10 @@ def create_book_tab(notebook, conn):
             while i < len(left) and j < len(right):
                 if (key_func(left[i]) <= key_func(right[j])) ^ reverse:
                     result.append(left[i])
-                    i += 1
                 else:
                     result.append(right[j])
-                    j += 1
+                i += 1
+                j += 1
             result.extend(left[i:])
             result.extend(right[j:])
             return result
@@ -286,27 +319,31 @@ def create_book_tab(notebook, conn):
                 writer.writerow([book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity])
         messagebox.showinfo("Xuất CSV", "Đã lưu file books_export.csv")
 
-    tk.Button(tab, text="Thêm", command=add_book).grid(row=6, column=0, pady = 10)
-    tk.Button(tab, text="Xóa", command=delete_book).grid(row=6, column=0, padx = 5, columnspan = 2 )
-    tk.Button(tab, text="Cập nhật", command=update_book).grid(row=11, column=2, sticky="e", padx = 400)
-    tk.Button(tab, text="Xuất CSV", command=export_to_csv).grid(row=6, column=1, pady=10, padx=15, sticky="e")
+    # Layout buttons
+    tk.Button(tab, text="Thêm",bg="white", command=add_book).grid(row=6, column=0, pady=10, sticky="ew", columnspan=2)
+    tk.Button(tab, text="Xóa", bg="white",command=delete_book).grid(row=7, column=0, pady=5, sticky="ew", columnspan=2)
+    tk.Button(tab, text="Cập nhật", bg="white",command=update_book).grid(row=8, column=0, pady=5, sticky="ew", columnspan=2)
+    tk.Button(tab, text="Xuất CSV", bg="white",command=export_to_csv).grid(row=9, column=0, pady=5, sticky="ew", columnspan=2)
+    tk.Button(tab, text="Làm mới",bg="white", command=reload_from_database).grid(row=10, column=0, pady=5, sticky="ew", columnspan=2)
 
-    # Tìm kiếm
-    tk.Label(tab, text="Tìm theo:").grid(row=8, column=0, sticky="e", padx=5, pady = 5)
+    # Search section
+    tk.Label(tab, text="Tìm theo:").grid(row=11, column=0, sticky="e", padx=5, pady=5)
     search_type = ttk.Combobox(tab, values=["ISBN", "Tiêu đề", "Tác giả"])
     search_type.set("Tiêu đề")
-    search_type.grid(row=8, column=1, pady= 5, sticky="w")
-    tk.Label(tab, text="Tìm theo:").grid(row=9, column=0, sticky="e", padx=5, pady = 5)
+    search_type.grid(row=11, column=1, pady=5, sticky="ew")
+    
+    tk.Label(tab, text="Từ khóa:").grid(row=12, column=0, sticky="e", padx=5, pady=5)
     search_entry = tk.Entry(tab)
-    search_entry.grid(row=9, column=1, pady = 5, sticky="w")
-    tk.Button(tab, text="Tìm kiếm", command=lambda: search_books(book_table)).grid(row=11, column=2, padx= 400, sticky="w")
+    search_entry.grid(row=12, column=1, pady=5, sticky="ew")
+    tk.Button(tab, text="Tìm kiếm", bg="white", command=lambda: search_books(book_table)).grid(row=13, column=0, pady=5, sticky="ew", columnspan=2)
 
-    # Sắp xếp
-    tk.Label(tab, text="Sắp xếp theo:").grid(row=10, column=0, sticky="e", padx=5, pady=5)
+    # Sort section
+    tk.Label(tab, text="Sắp xếp theo:").grid(row=14, column=0, sticky="e", padx=5, pady=5)
     sort_type = ttk.Combobox(tab, values=["Tiêu đề (A-Z)", "Tiêu đề (Z-A)", "ISBN (tăng dần)", "ISBN (giảm dần)"])
     sort_type.set("Tiêu đề (A-Z)")
-    sort_type.grid(row=10, column=1, pady= 5,sticky="w")
-    tk.Button(tab, text="Sắp xếp", command=lambda: sort_books(book_table)).grid(row=11, column=2, padx=0, sticky="s")
+    sort_type.grid(row=14, column=1, pady=5, sticky="ew")
+    tk.Button(tab, text="Sắp xếp", bg="white", command=lambda: sort_books(book_table)).grid(row=15, column=0, pady=5, sticky="ew", columnspan=2)
+
 
     tree.bind("<ButtonRelease-1>", load_selected_book)
     refresh_tree()
