@@ -82,7 +82,7 @@ def create_statistics_tab(notebook, db_connection):
     # Khởi tạo LoanManager mà không cần ht_books, ht_readers của các module khác
     # vì nó sẽ dùng ht_books_stats và ht_readers_stats của riêng mình.
     # Nếu constructor của LoanManager yêu cầu, bạn có thể truyền chúng vào.
-    loan_manager_stats = LoanManager()
+    loan_manager_stats = LoanManager(db_connection)
                                      # Hoặc LoanManager() nếu constructor cho phép
 
     # --- Giao diện ---
@@ -99,15 +99,13 @@ def create_statistics_tab(notebook, db_connection):
 
     # --- Hàm nạp dữ liệu từ CSDL vào CTDL của Module 4 ---
     def refresh_data_for_statistics_command():
-        # Xóa dữ liệu cũ trong CTDL của Module 4
-        # Cách clear HashTable (cần đảm bảo lớp HashTable của bạn có cách clear hiệu quả)
         ht_books_stats.size = 0 
         ht_books_stats.table = [type(ht_books_stats.table[0])() for _ in range(ht_books_stats.capacity)] # Tạo lại list các LinkedListForHash rỗng
 
         ht_readers_stats.size = 0
         ht_readers_stats.table = [type(ht_readers_stats.table[0])() for _ in range(ht_readers_stats.capacity)]
         
-        loan_manager_stats.bst.root = None # Reset cây AVL
+        loan_manager_stats.loans.root = None # Reset cây AVL
         loan_manager_stats.loan_id_counter = 1 # Reset counter
 
         cursor = db_connection.cursor()
@@ -151,7 +149,7 @@ def create_statistics_tab(notebook, db_connection):
                     if borrow_date_obj and due_date_obj: # Ngày mượn và hạn trả là bắt buộc
                         # Tạo LoanRecord với loan_id từ CSDL
                         loan = LoanRecord(loan_id_from_db, row[1], row[2], borrow_date_obj, due_date_obj, return_date_obj, row[6])
-                        loan_manager_stats.bst.insert(loan) # Sử dụng insert của LoanBST
+                        loan_manager_stats.loans.insert(loan) # Sử dụng insert của Loanloans
                         loaded_loans_count += 1
                     else:
                         print(f"Cảnh báo (Stats): Phiếu mượn {row[0]} thiếu ngày mượn/hạn trả, bỏ qua.")
@@ -162,7 +160,7 @@ def create_statistics_tab(notebook, db_connection):
             
             # Cập nhật trạng thái phiếu mượn sau khi nạp
             today = datetime.datetime.now().date()
-            for record in loan_manager_stats.bst.inorder(): # Duyệt cây
+            for record in loan_manager_stats.loans.inorder(): # Duyệt cây
                 if record.return_date: record.status = "Đã trả"
                 elif record.due_date and record.due_date < today: record.status = "Quá hạn"
                 elif not record.return_date: record.status = "Đang mượn"
@@ -182,11 +180,11 @@ def create_statistics_tab(notebook, db_connection):
     def display_top_n_books_command():
         clear_output_area_command()
         # Kiểm tra xem đã nạp dữ liệu chưa
-        if ht_books_stats.size == 0 and not loan_manager_stats.bst.inorder():
+        if ht_books_stats.size == 0 and not loan_manager_stats.loans.inorder():
             messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
             return
         n_top = 10
-        all_loan_records = loan_manager_stats.bst.inorder()
+        all_loan_records = loan_manager_stats.loans.inorder()
         if not all_loan_records:
             output_text_area.insert(tk.END, "Chưa có dữ liệu mượn sách để thống kê.\n"); return
 
@@ -204,11 +202,11 @@ def create_statistics_tab(notebook, db_connection):
 
     def display_top_n_readers_command():
         clear_output_area_command()
-        if ht_readers_stats.size == 0 and not loan_manager_stats.bst.inorder():
+        if ht_readers_stats.size == 0 and not loan_manager_stats.loans.inorder():
             messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
             return
         n_top = 10
-        all_loan_records = loan_manager_stats.bst.inorder()
+        all_loan_records = loan_manager_stats.loans.inorder()
         if not all_loan_records:
             output_text_area.insert(tk.END, "Chưa có dữ liệu mượn sách để thống kê.\n"); return
 
@@ -247,7 +245,7 @@ def create_statistics_tab(notebook, db_connection):
 
     def display_books_currently_loaned_stats_command():
         clear_output_area_command()
-        all_loan_records = loan_manager_stats.bst.inorder()
+        all_loan_records = loan_manager_stats.loans.inorder()
         if not all_loan_records:
              messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
              return
@@ -265,7 +263,7 @@ def create_statistics_tab(notebook, db_connection):
 
     def display_books_overdue_stats_command():
         clear_output_area_command()
-        all_loan_records = loan_manager_stats.bst.inorder()
+        all_loan_records = loan_manager_stats.loans.inorder()
         if not all_loan_records:
              messagebox.showwarning("Chưa có dữ liệu", "Vui lòng 'Làm mới Dữ liệu Thống kê' trước.")
              return
