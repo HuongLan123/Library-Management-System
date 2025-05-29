@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
 import csv
+from tkinter import font # Import module font
 
 # =============================
 # HashTable và Reader Class để quản lý nội bộ
@@ -108,7 +109,7 @@ class Reader:
 
 def create_reader_tab(notebook, conn):
     tab = ttk.Frame(notebook)
-    notebook.add(tab, text="Quản lý Bạn đọc")
+    notebook.add(tab, text="👥 Quản lý Bạn đọc")
 
     reader_table = HashTable() 
 
@@ -120,14 +121,19 @@ def create_reader_tab(notebook, conn):
     labels = ["Mã bạn đọc", "Họ tên", "Ngày sinh", "Địa chỉ"]
     entries = {}
     for i, label in enumerate(labels):
-        tk.Label(tab, text=label).grid(row=i, column=0, padx=5,pady=0, sticky="e")
+        tk.Label(tab, text=label).grid(row=i, column=0, padx=5,pady=5, sticky="e") # Giảm pady
         entry = tk.Entry(tab)
-        entry.grid(row=i, column=1, padx=5, pady=0, sticky="w")
+        entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew") # Giảm pady và thêm sticky="ew"
         entries[label] = entry
 
-    # Frame chứa Treeview và Scrollbar (giống ui_books.py)
+    # Cấu hình để cột 2 (nơi Treeview sẽ nằm) giãn nở
+    tab.grid_columnconfigure(2, weight=1) 
+
+    # Frame chứa Treeview và Scrollbar
     tree_frame = ttk.Frame(tab)
-    tree_frame.grid(row=0, column=2, rowspan=4, padx=100, pady=5, sticky="nsew") # rowspan được tăng lên
+    # Tăng rowspan để bảng to hơn, rowspan được tăng lên đến 18 hoặc 20 để bao phủ hết các nút và tìm kiếm/sắp xếp
+    # column=2 để nó nằm bên phải của các entry/button, sticky="nsew" để nó giãn nở
+    tree_frame.grid(row=0, column=2, rowspan=18, padx=25, pady= 5, sticky="nsew") 
 
     # Thanh cuộn dọc
     scrollbar_y = ttk.Scrollbar(tree_frame, orient="vertical")
@@ -139,8 +145,8 @@ def create_reader_tab(notebook, conn):
 
     # Treeview có gắn scrollbar
     tree = ttk.Treeview(tree_frame, columns=labels, show="headings",
-                        yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
-    tree.pack(fill="both", expand=True)
+                         yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+    tree.pack(fill="both", expand=True) # expand=True để treeview lấp đầy tree_frame
 
     # Gắn scrollbar với tree
     scrollbar_y.config(command=tree.yview)
@@ -148,7 +154,8 @@ def create_reader_tab(notebook, conn):
 
     for col in labels:
         tree.heading(col, text=col)
-        tree.column(col, width=150, anchor="w") # Tùy chỉnh độ rộng cột cho phù hợp với dữ liệu bạn đọc
+        # Tăng width để cột rộng hơn, sử dụng font.Font().measure để tính toán độ rộng văn bản
+        tree.column(col, width=font.Font().measure(col) + 50, minwidth=100, anchor="w") 
 
     def refresh_tree(data=None):
         tree.delete(*tree.get_children())
@@ -177,10 +184,14 @@ def create_reader_tab(notebook, conn):
         conn.commit()
         messagebox.showinfo("Thành công", "Đã thêm bạn đọc")
         refresh_tree() 
+        # Clear entry fields after adding
+        for entry in entries.values():
+            entry.delete(0, tk.END)
 
     def delete_reader():
         selected = tree.selection()
         if not selected:
+            messagebox.showerror("Lỗi", "Vui lòng chọn bạn đọc để xóa.")
             return
         reader_id = tree.item(selected[0])["values"][0]
         
@@ -189,8 +200,13 @@ def create_reader_tab(notebook, conn):
             cursor.execute("DELETE FROM readers WHERE reader_id = ?", (reader_id,))
             conn.commit()
             refresh_tree() 
+            messagebox.showinfo("Thành công", "Đã xóa bạn đọc")
         else:
             messagebox.showerror("Lỗi", "Không tìm thấy bạn đọc để xóa.")
+        # Clear entry fields after deleting
+        for entry in entries.values():
+            entry.delete(0, tk.END)
+
 
     def update_reader():
         selected = tree.selection()
@@ -207,6 +223,7 @@ def create_reader_tab(notebook, conn):
             messagebox.showerror("Lỗi", "Vui lòng điền đầy đủ thông tin.")
             return
 
+        # Ensure the ISBN in the entry matches the selected item's ISBN
         r = reader_table.search(reader_id)
         if not r:
             messagebox.showerror("Lỗi", "Không tìm thấy bạn đọc để cập nhật")
@@ -220,6 +237,7 @@ def create_reader_tab(notebook, conn):
                        (name, birth_date, address, reader_id))
         conn.commit()
         refresh_tree() 
+        messagebox.showinfo("Thành công", "Đã cập nhật bạn đọc")
 
     def load_selected_reader(event):
         selected = tree.selection()
@@ -238,7 +256,7 @@ def create_reader_tab(notebook, conn):
                 result.append(reader)
             elif mode == "Họ tên" and keyword in reader.name.lower():
                 result.append(reader)
-            elif mode == "Địa chỉ" and keyword in reader.address.lower(): # Thêm tìm theo địa chỉ
+            elif mode == "Địa chỉ" and keyword in reader.address.lower():
                 result.append(reader)
 
         refresh_tree(result) 
@@ -248,10 +266,14 @@ def create_reader_tab(notebook, conn):
         mode = sort_type.get()
         reverse = False
 
+        def extract_vietnamese_last_name(full_name):
+            parts = full_name.strip().lower().split()
+            return parts[-1] if parts else ""
+
         if mode == "Họ tên (A-Z)":
-            key_func = lambda r: r.name.lower()
+            key_func = lambda r: extract_vietnamese_last_name(r.name)
         elif mode == "Họ tên (Z-A)":
-            key_func = lambda r: r.name.lower()
+            key_func = lambda r: extract_vietnamese_last_name(r.name)
             reverse = True
         elif mode == "Mã số (tăng dần)":
             key_func = lambda r: r.reader_id
@@ -275,10 +297,10 @@ def create_reader_tab(notebook, conn):
             while i < len(left) and j < len(right):
                 if (key_func(left[i]) <= key_func(right[j])) ^ reverse:
                     result.append(left[i])
-                    i += 1
                 else:
                     result.append(right[j])
-                    j += 1
+                i += 1
+                j += 1
             result.extend(left[i:])
             result.extend(right[j:])
             return result
@@ -294,29 +316,32 @@ def create_reader_tab(notebook, conn):
                 writer.writerow([r.reader_id, r.name, r.birth_date, r.address])
         messagebox.showinfo("Xuất CSV", "Đã lưu file readers_export.csv")
 
-    # Các nút Thêm, Xóa, Cập nhật, Xuất CSV
-    tk.Button(tab, text="Thêm", bg="white", command=add_reader).grid(row=6, column=0, pady=5)
-    tk.Button(tab, text="Xóa", bg="white", command=delete_reader).grid(row=6, column=0, padx=10,columnspan= 2)
-    tk.Button(tab, text="Cập nhật", bg="white", command=update_reader).grid(row=7, column=2, pady=10, padx= 200)
-    tk.Button(tab, text="Xuất CSV", bg="white", command=export_csv).grid(row=6, column=1, padx = 15, sticky = "e")
+    # Các nút Thêm, Xóa, Xuất CSV
+    # Đặt các nút trên cùng một hàng để chúng gần nhau hơn
+    tk.Button(tab, text="Thêm", bg="white", command=add_reader).grid(row=len(labels), column=0, pady= 5, sticky="ew")
+    tk.Button(tab, text="Xóa", bg="white", command=delete_reader).grid(row=len(labels), column=1, padx= 15, pady = 5, sticky="ew")
+    tk.Button(tab, text="Xuất CSV", bg="white", command=export_csv).grid(row=len(labels) + 1, column=0, sticky="ew", pady = 5, columnspan=2)
+
+    # Nút Cập nhật (di chuyển lên gần các nút khác)
+    tk.Button(tab, text="Cập nhật", bg="white", command=update_reader).grid(row=len(labels) + 2, column=0, pady = 5,sticky="ew", columnspan=2)
 
     # Khung Tìm kiếm
-    tk.Label(tab, text="Tìm theo:").grid(row=9, column=0, sticky="e", padx=5, pady=5)
+    tk.Label(tab, text="Tìm theo:").grid(row=len(labels) + 3, column=0, sticky="e", padx=5, pady=5) # Giảm pady
     search_type = ttk.Combobox(tab, values=["Mã bạn đọc", "Họ tên", "Địa chỉ"])
     search_type.set("Họ tên")
-    search_type.grid(row=9, column=1, pady=5, sticky="w")
+    search_type.grid(row=len(labels) + 3, column=1, pady=5, sticky="ew") # Giảm pady và thêm sticky="ew"
     
-    tk.Label(tab, text="Từ khóa:").grid(row=10, column=0, sticky="e", padx=5, pady=5)
+    tk.Label(tab, text="Từ khóa:").grid(row=len(labels) + 4, column=0, sticky="e", padx=5, pady=2) # Giảm pady
     search_entry = tk.Entry(tab)
-    search_entry.grid(row=10, column=1, pady=5, sticky="w")
-    tk.Button(tab, text="Tìm kiếm", bg="white", command=lambda: search_readers(reader_table)).grid(row=11, column=1, pady=5, sticky="w")
+    search_entry.grid(row=len(labels) + 4, column=1, pady=5, sticky="ew") # Giảm pady và thêm sticky="ew"
+    tk.Button(tab, text="Tìm kiếm", bg="white", command=lambda: search_readers(reader_table)).grid(row=len(labels) + 5, column=0, pady=5, sticky="ew", columnspan=2)
 
     # Khung Sắp xếp
-    tk.Label(tab, text="Sắp xếp theo:").grid(row=12, column=0, sticky="e", padx=5, pady=5)
+    tk.Label(tab, text="Sắp xếp theo:").grid(row=len(labels) + 6, column=0, sticky="e", padx=5, pady=5) # Giảm pady
     sort_type = ttk.Combobox(tab, values=["Họ tên (A-Z)", "Họ tên (Z-A)", "Mã số (tăng dần)", "Mã số (giảm dần)"])
     sort_type.set("Họ tên (A-Z)")
-    sort_type.grid(row=12, column=1, pady=5, sticky="w")
-    tk.Button(tab, bg="white", text="Sắp xếp", command=lambda: sort_readers(reader_table)).grid(row=13, column=1, pady=5, sticky="w")
+    sort_type.grid(row=len(labels) + 6, column=1, pady=5, sticky="ew") # Giảm pady và thêm sticky="ew"
+    tk.Button(tab, bg="white", text="Sắp xếp", command=lambda: sort_readers(reader_table)).grid(row=len(labels) + 7, column=0, pady=5, sticky="ew", columnspan=2)
 
     tree.bind("<ButtonRelease-1>", load_selected_reader)
     refresh_tree()
