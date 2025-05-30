@@ -336,30 +336,94 @@ def create_loan_tab(notebook, loan_manager):
     tab.grid_rowconfigure(1, weight=1)
     tab.grid_columnconfigure(0, weight=1)
 
-    output_text = tk.Text(output_frame, height=20, wrap="none")
-    output_text.pack(fill="both", expand=True)
-    scroll_y = ttk.Scrollbar(output_frame, orient="vertical", command=output_text.yview)
-    scroll_y.pack(side="right", fill="y")
-    output_text.config(yscrollcommand=scroll_y.set)
+    columns = ("loan_id", "reader_id", "reader_name", "isbn", "book_title", "borrow_date", "due_date", "return_date", "status")
+    tree = ttk.Treeview(output_frame, columns=columns, show="headings")
+
+    # Thiết lập tên cột và độ rộng
+    tree.heading("loan_id", text="ID")
+    tree.column("loan_id", width=50, anchor="center")
+
+    tree.heading("reader_id", text="Mã bạn đọc")
+    tree.column("reader_id", width=100)
+
+    tree.heading("reader_name", text="Tên bạn đọc")
+    tree.column("reader_name", width=150)
+
+    tree.heading("isbn", text="ISBN")
+    tree.column("isbn", width=120)
+
+    tree.heading("book_title", text="Tên sách")
+    tree.column("book_title", width=200)
+
+    tree.heading("borrow_date", text="Ngày mượn")
+    tree.column("borrow_date", width=100)
+
+    tree.heading("due_date", text="Hạn trả")
+    tree.column("due_date", width=100)
+
+    tree.heading("return_date", text="Ngày trả")
+    tree.column("return_date", width=100)
+
+    tree.heading("status", text="Trạng thái")
+    tree.column("status", width=100)
+
+    # Thêm thanh cuộn
+    scrollbar_y = ttk.Scrollbar(output_frame, orient="vertical", command=tree.yview)
+    scrollbar_y.pack(side="right", fill="y")
+    tree.configure(yscroll=scrollbar_y.set)
+
+    scrollbar_x = ttk.Scrollbar(output_frame, orient="horizontal", command=tree.xview)
+    scrollbar_x.pack(side="bottom", fill="x")
+    tree.configure(xscroll=scrollbar_x.set)
+
+    tree.pack(fill="both", expand=True)
+
 
     def display_loans(loans):
-        output_text.delete("1.0", tk.END)
+        for row in tree.get_children():
+            tree.delete(row)
         if not loans:
-            output_text.insert(tk.END, "Không có dữ liệu.\n")
+            messagebox.showinfo("Thông báo", "Không có dữ liệu.")
             return
-        # Cập nhật tiêu đề cột để bao gồm tên sách và tên bạn đọc
-        output_text.insert(tk.END, f"{'ID':<5} {'Mã bạn đọc':<10} {'Tên bạn đọc':<20} {'ISBN':<15} {'Tên sách':<30} {'Mượn':<12} {'Đến hạn':<12} {'Trả':<12} {'Trạng thái':<10}\n")
-        output_text.insert(tk.END, "-" * 150 + "\n") # Điều chỉnh độ dài dấu gạch ngang
         for loan in loans:
-            output_text.insert(tk.END, f"{loan.loan_id:<5} {loan.reader_id:<10} {loan.reader_name:<20} {loan.isbn:<15} {loan.book_title:<30} {loan.borrow_date.strftime('%Y-%m-%d'):<12} {loan.due_date.strftime('%Y-%m-%d'):<12} {loan.return_date.strftime('%Y-%m-%d') if loan.return_date else 'N/A':<12} {loan.status:<10}\n")
+            tree.insert("", "end", values=(
+                loan.loan_id,
+                loan.reader_id,
+                loan.reader_name,
+                loan.isbn,
+                loan.book_title,
+                loan.borrow_date.strftime('%Y-%m-%d'),
+                loan.due_date.strftime('%Y-%m-%d'),
+                loan.return_date.strftime('%Y-%m-%d') if loan.return_date else "N/A",
+                loan.status
+        ))
+
 
     def display_loan_counts(counts):
-        output_text.delete("1.0", tk.END)
-        # Cập nhật tiêu đề cột để hiển thị tên sách
-        output_text.insert(tk.END, f"{'ISBN - Tên sách':<45} {'Số lượt mượn':<15}\n")
-        output_text.insert(tk.END, "-" * 60 + "\n")
+        # Xóa tất cả cột cũ
+        for col in tree["columns"]:
+            tree.heading(col, text="")
+            tree.column(col, width=0)
+        tree["columns"] = ("isbn_title", "count")
+
+        tree.heading("isbn_title", text="ISBN - Tên sách")
+        tree.column("isbn_title", width=400)
+
+        tree.heading("count", text="Số lượt mượn")
+        tree.column("count", width=100, anchor="center")
+
+        # Xóa dữ liệu cũ
+        for row in tree.get_children():
+            tree.delete(row)
+
+        if not counts:
+            messagebox.showinfo("Thông báo", "Không có dữ liệu.")
+            return
+
+    # Thêm dữ liệu mới
         for isbn_title, count in counts.items():
-            output_text.insert(tk.END, f"{isbn_title:<45} {count:<15}\n")
+            tree.insert("", "end", values=(isbn_title, count))
+
 
     def create_loan():
         # Đảm bảo các giá trị được strip để tránh khoảng trắng
