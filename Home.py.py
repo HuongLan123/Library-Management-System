@@ -3,13 +3,14 @@ from tkinter import ttk
 import sqlite3
 
 # Kết nối cơ sở dữ liệu SQLite
-conn = sqlite3.connect("library3.db")
+conn = sqlite3.connect("library4.db")
 cursor = conn.cursor()
 
 # Tạo bảng nếu chưa tồn tại
 cursor.execute('''CREATE TABLE IF NOT EXISTS books (
     isbn TEXT PRIMARY KEY,
     title TEXT,
+    genre TEXT,           
     author TEXT,
     year INTEGER,
     quantity INTEGER,
