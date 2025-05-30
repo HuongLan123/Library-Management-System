@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime # Cho các thao tác ngày tháng
 import sqlite3
-db_connection = sqlite3.connect("library3.db") # Kết nối CSDL SQLite
+db_connection = sqlite3.connect("library4.db") # Kết nối CSDL SQLite
 # ==============================================================================
 # IMPORT CÁC LỚP CTDL TỰ CÀI ĐẶT VÀ ĐỐI TƯỢNG
 # ==============================================================================
@@ -125,9 +125,9 @@ def create_statistics_tab(notebook, db_connection):
 
         # Nạp sách
         try:
-            for row in cursor.execute("SELECT isbn, title, author, year, quantity, available_quantity FROM books"):
-                book = Book(row[0], row[1], row[2], int(row[3]), int(row[4]))
-                book.available_quantity = int(row[5]) # Gán lại từ CSDL
+            for row in cursor.execute("SELECT isbn, title, genre, author, year, quantity, available_quantity FROM books"):
+                book = Book(row[0], row[1], row[2], row[3],int(row[4]), int(row[5]))
+                book.available_quantity = int(row[6]) # Gán lại từ CSDL
                 ht_books_stats.insert(book.isbn, book)
                 loaded_books_count += 1
         except Exception as e:
