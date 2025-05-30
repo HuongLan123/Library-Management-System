@@ -19,25 +19,35 @@ except ImportError as e:
 # ==============================================================================
 # GIẢI THUẬT TỰ CÀI ĐẶT 
 # ==============================================================================
-def self_implemented_insertion_sort(data_list, key_func=None, reverse=False):
-    """Sắp xếp danh sách bằng Insertion Sort tự cài đặt."""
-    n = len(data_list)
-    for i in range(1, n):
-        current_item = data_list[i]
-        current_key_value = key_func(current_item) if key_func else current_item
-        j = i - 1
-        while j >= 0:
-            item_to_compare_with = data_list[j]
-            key_to_compare_with = key_func(item_to_compare_with) if key_func else item_to_compare_with
-            should_shift = (key_to_compare_with > current_key_value) if not reverse else \
-                           (key_to_compare_with < current_key_value)
-            if should_shift:
-                data_list[j + 1] = data_list[j]
-                j -= 1
+def self_implemented_merge_sort(data_list, key_func=None, reverse=False):
+    """Sắp xếp danh sách bằng Merge Sort tự cài đặt."""
+    
+    def merge_sort(arr):
+        if len(arr) <= 1:
+            return arr
+        mid = len(arr) // 2
+        left = merge_sort(arr[:mid])
+        right = merge_sort(arr[mid:])
+        return merge(left, right)
+
+    def merge(left, right):
+        merged = []
+        i = j = 0
+        while i < len(left) and j < len(right):
+            a = key_func(left[i]) if key_func else left[i]
+            b = key_func(right[j]) if key_func else right[j]
+            if (a <= b) ^ reverse:
+                merged.append(left[i])
+                i += 1
             else:
-                break
-        data_list[j + 1] = current_item
-    return data_list
+                merged.append(right[j])
+                j += 1
+        merged.extend(left[i:])
+        merged.extend(right[j:])
+        return merged
+
+    return merge_sort(data_list)
+
 
 def self_implemented_count_frequencies(list_of_objects, attribute_name_to_count):
     """Đếm tần suất của một thuộc tính trong danh sách đối tượng."""
@@ -192,7 +202,7 @@ def create_statistics_tab(notebook, db_connection):
         if not isbn_frequencies:
             output_text_area.insert(tk.END, "Không có ISBN nào được ghi nhận mượn.\n"); return
             
-        sorted_top_books_data = self_implemented_insertion_sort(list(isbn_frequencies), key_func=lambda pair: pair[1], reverse=True)
+        sorted_top_books_data = self_implemented_merge_sort(list(isbn_frequencies), key_func=lambda pair: pair[1], reverse=True)
 
         output_text_area.insert(tk.END, f"--- Top {n_top} Sách Được Mượn Nhiều Nhất ---\n")
         for i, (isbn, count) in enumerate(sorted_top_books_data[:n_top], 1):
@@ -214,7 +224,7 @@ def create_statistics_tab(notebook, db_connection):
         if not reader_id_frequencies:
             output_text_area.insert(tk.END, "Không có bạn đọc nào mượn sách.\n"); return
             
-        sorted_top_readers_data = self_implemented_insertion_sort(list(reader_id_frequencies), key_func=lambda pair: pair[1], reverse=True)
+        sorted_top_readers_data = self_implemented_merge_sort(list(reader_id_frequencies), key_func=lambda pair: pair[1], reverse=True)
 
         output_text_area.insert(tk.END, f"--- Top {n_top} Bạn Đọc Mượn Sách Nhiều Nhất ---\n")
         for i, (reader_id, count) in enumerate(sorted_top_readers_data[:n_top], 1):
