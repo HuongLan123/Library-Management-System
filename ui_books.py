@@ -93,16 +93,17 @@ class HashTable:
         return result
 
 class Book:
-    def __init__(self, isbn, title, author, year, quantity):
+    def __init__(self, isbn, title, genre, author, year, quantity):
         self.isbn = isbn
         self.title = title
+        self.genre = genre
         self.author = author
         self.year = year
         self.quantity = quantity
         self.available_quantity = quantity
 
     def __str__(self):
-        return f"{self.isbn} | {self.title} | {self.author} | {self.year} | {self.quantity} | {self.available_quantity}"
+        return f"{self.isbn} | {self.title} | {self.genre}| {self.author} | {self.year} | {self.quantity} | {self.available_quantity}"
 
     def __eq__(self, other):
         return isinstance(other, Book) and self.isbn == other.isbn
@@ -122,19 +123,26 @@ def create_book_tab(notebook, conn):
 
     cursor = conn.cursor()
     for row in cursor.execute("SELECT * FROM books"):
-        book = Book(*row[:5])
-        book.available_quantity = row[5]
+        book = Book(row[0], row[1], row[2], row[3], row[4], row[5])
+        book.available_quantity = row[6]
         book_table.insert(book.isbn, book)
 
-    labels = ["ISBN", "Tiêu đề", "Tác giả", "Năm", "Số lượng"]
+    labels = ["ISBN", "Tiêu đề", "Thể loại","Tác giả", "Năm", "Số lượng"]
     entries = {}
     for i, label in enumerate(labels):
         tk.Label(tab, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="e")
         entry = tk.Entry(tab)
         entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew") # Changed sticky to "ew" for entries
         entries[label] = entry
+        if i == 2:
+            genres = ["Khoa học", "Văn học", "Thiếu nhi", "Giáo trình", "Tiểu thuyết", "Lịch sử", "Tâm lý", "Khác"]
+            tk.Label(tab, text="Thể loại").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            genre_combobox = ttk.Combobox(tab, values=genres, state="readonly")
+            genre_combobox.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+            entries["Thể loại"] = genre_combobox
 
-    tree = ttk.Treeview(tab, columns=("ISBN", "Tiêu đề", "Tác giả", "Năm", "SL", "Còn"), show="headings")
+
+    tree = ttk.Treeview(tab, columns=("ISBN", "Tiêu đề","Thể loại", "Tác giả", "Năm", "SL", "Còn"), show="headings")
     for col in tree["columns"]:
         tree.heading(col, text=col, anchor="center")
         # Set a minimum width for columns to prevent them from becoming too narrow
@@ -162,8 +170,8 @@ def create_book_tab(notebook, conn):
 
         # Truy vấn lại dữ liệu từ SQLite và chèn vào bảng băm
         for row in cursor.execute("SELECT * FROM books"):
-            book = Book(*row[:5])
-            book.available_quantity = row[5]
+            book = Book(*row[:6])
+            book.available_quantity = row[6]
             book_table.insert(book.isbn, book)
 
         # Cập nhật lại Treeview
@@ -172,11 +180,12 @@ def create_book_tab(notebook, conn):
     def refresh_tree():
         tree.delete(*tree.get_children())
         for book in book_table.get_all_values():
-            tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
+            tree.insert("", "end", values=(book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity))
 
     def add_book():
         isbn = entries["ISBN"].get().strip()
         title = entries["Tiêu đề"].get().strip()
+        genre = entries["Thể loại"].get().strip() or "Khác"
         author = entries["Tác giả"].get().strip()
         try:
             year = int(entries["Năm"].get().strip())
@@ -189,9 +198,9 @@ def create_book_tab(notebook, conn):
             messagebox.showerror("Lỗi", "Sách đã tồn tại trong hệ thống")
             return
 
-        book = Book(isbn, title, author, year, quantity)
+        book = Book(isbn, title,genre, author, year, quantity)
         book_table.insert(isbn, book)
-        cursor.execute("INSERT INTO books VALUES (?, ?, ?, ?, ?, ?)", (isbn, title, author, year, quantity, quantity))
+        cursor.execute("INSERT INTO books VALUES (?, ?, ?,?, ?, ?, ?)", (isbn, title, genre, author, year, quantity, quantity))
         conn.commit()
         messagebox.showinfo("Thành công", "Đã thêm sách")
         refresh_tree()
@@ -215,6 +224,7 @@ def create_book_tab(notebook, conn):
             messagebox.showerror("Lỗi", "Chọn sách để cập nhật")
             return
         isbn = entries["ISBN"].get().strip()
+        genre = entries["Thể loại"].get().strip() or "Khác"
         title = entries["Tiêu đề"].get().strip()
         author = entries["Tác giả"].get().strip()
         try:
@@ -230,14 +240,15 @@ def create_book_tab(notebook, conn):
 
         diff = quantity - book.quantity
         book.title = title
+        book.genre = entries.get("Thể loại", "Không xác định")  # Optional field, default to "Không xác định"
         book.author = author
         book.year = year
         book.quantity = quantity
         book.available_quantity += diff
         book_table.insert(isbn, book) # Re-insert to update in hash table if key is the same
 
-        cursor.execute("UPDATE books SET title=?, author=?, year=?, quantity=?, available_quantity=? WHERE isbn=?",
-                       (title, author, year, quantity, book.available_quantity, isbn))
+        cursor.execute("UPDATE books SET title=?, genre=?, author=?, year=?, quantity=?, available_quantity=? WHERE isbn=?",
+                       (title, genre, author, year, quantity, book.available_quantity, isbn))
         conn.commit()
         refresh_tree()
         messagebox.showinfo("Thành công", "Đã cập nhật sách")
@@ -264,7 +275,7 @@ def create_book_tab(notebook, conn):
 
         tree.delete(*tree.get_children())
         for book in result:
-            tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
+            tree.insert("", "end", values=(book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity))
 
     def sort_books(table):
         books = table.get_all_values()
@@ -308,7 +319,7 @@ def create_book_tab(notebook, conn):
         sorted_books = merge_sort(books)
         tree.delete(*tree.get_children())
         for book in sorted_books:
-            tree.insert("", "end", values=(book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity))
+            tree.insert("", "end", values=(book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity))
 
 
     def export_to_csv():
@@ -316,7 +327,7 @@ def create_book_tab(notebook, conn):
             writer = csv.writer(f)
             writer.writerow(["ISBN", "Tiêu đề", "Tác giả", "Năm", "Số lượng", "Còn lại"])
             for book in book_table.get_all_values():
-                writer.writerow([book.isbn, book.title, book.author, book.year, book.quantity, book.available_quantity])
+                writer.writerow([book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity])
         messagebox.showinfo("Xuất CSV", "Đã lưu file books_export.csv")
 
     # Layout buttons
