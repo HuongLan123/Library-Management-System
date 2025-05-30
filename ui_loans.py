@@ -4,11 +4,13 @@ import sqlite3
 from datetime import datetime, timedelta
 import sys
 import io
+
+# Cấu hình in Unicode ra console nếu chạy trên Windows
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-# ============================\
-# Cấu trúc dữ liệu cho phiếu mượn sách
-# ============================\
+# ===================================================
+# Cấu trúc dữ liệu: Phiếu mượn sách & BST (có AVL logic)
+# ===================================================
 
 class LoanRecord:
     def __init__(self, loan_id, reader_id, isbn, borrow_date, due_date, return_date=None, status="Đang mượn", book_title=None, reader_name=None):
@@ -19,11 +21,10 @@ class LoanRecord:
         self.due_date = datetime.strptime(due_date, "%Y-%m-%d %H:%M:%S.%f") if isinstance(due_date, str) else due_date
         self.return_date = datetime.strptime(return_date, "%Y-%m-%d %H:%M:%S.%f") if isinstance(return_date, str) and return_date != "None" else return_date
         self.status = status
-        self.book_title = book_title  # Thêm thuộc tính tên sách
-        self.reader_name = reader_name # Thêm thuộc tính tên bạn đọc
+        self.book_title = book_title
+        self.reader_name = reader_name
 
     def to_tuple(self):
-        # Không cần book_title và reader_name trong tuple để lưu vào DB vì chúng được lấy từ bảng khác
         return (self.loan_id, self.reader_id, self.isbn,
                 self.borrow_date.strftime("%Y-%m-%d %H:%M:%S.%f") if self.borrow_date else None,
                 self.due_date.strftime("%Y-%m-%d %H:%M:%S.%f") if self.due_date else None,
@@ -31,15 +32,11 @@ class LoanRecord:
                 self.status)
 
     def __str__(self):
-        return (f"ID Phiếu: {self.loan_id}, Bạn đọc ID: {self.reader_id} ({self.reader_name}), " # Hiển thị tên bạn đọc
-                f"ISBN: {self.isbn} ({self.book_title}), " # Hiển thị tên sách
+        return (f"ID Phiếu: {self.loan_id}, Bạn đọc ID: {self.reader_id} ({self.reader_name}), "
+                f"ISBN: {self.isbn} ({self.book_title}), "
                 f"Ngày mượn: {self.borrow_date.strftime('%Y-%m-%d')}, Ngày trả: {self.due_date.strftime('%Y-%m-%d')}, "
                 f"Ngày thực trả: {self.return_date.strftime('%Y-%m-%d') if self.return_date else 'N/A'}, "
                 f"Trạng thái: {self.status}")
-
-# ============================\
-# Cấu trúc dữ liệu cây tìm kiếm nhị phân (Binary Search Tree) cho phiếu mượn sách
-# ============================\
 
 class TreeNode:
     def __init__(self, key, value):
@@ -47,31 +44,64 @@ class TreeNode:
         self.value = value
         self.left = None
         self.right = None
+        self.height = 1
 
 class LoanBST:
     def __init__(self):
         self.root = None
 
-    def insert(self, loan_record):
-        key = loan_record.loan_id
-        if self.root is None:
-            self.root = TreeNode(key, loan_record)
-        else:
-            self._insert_recursive(self.root, key, loan_record)
+    def _get_height(self, node):
+        return node.height if node else 0
 
-    def _insert_recursive(self, node, key, loan_record):
+    def _get_balance(self, node):
+        return self._get_height(node.left) - self._get_height(node.right) if node else 0
+
+    def _rotate_left(self, z):
+        y = z.right
+        T2 = y.left
+        y.left = z
+        z.right = T2
+        z.height = 1 + max(self._get_height(z.left), self._get_height(z.right))
+        y.height = 1 + max(self._get_height(y.left), self._get_height(y.right))
+        return y
+
+    def _rotate_right(self, y):
+        x = y.left
+        T2 = x.right
+        x.right = y
+        y.left = T2
+        y.height = 1 + max(self._get_height(y.left), self._get_height(y.right))
+        x.height = 1 + max(self._get_height(x.left), self._get_height(x.right))
+        return x
+
+    def insert(self, loan_record):
+        self.root = self._insert_recursive(self.root, loan_record.loan_id, loan_record)
+
+    def _insert_recursive(self, node, key, record):
+        if node is None:
+            return TreeNode(key, record)
+
         if key < node.key:
-            if node.left is None:
-                node.left = TreeNode(key, loan_record)
-            else:
-                self._insert_recursive(node.left, key, loan_record)
-        elif key > node.key:
-            if node.right is None:
-                node.right = TreeNode(key, loan_record)
-            else:
-                self._insert_recursive(node.right, key, loan_record)
+            node.left = self._insert_recursive(node.left, key, record)
         else:
-            node.value = loan_record # Update existing record if key is same
+            node.right = self._insert_recursive(node.right, key, record)
+
+        node.height = 1 + max(self._get_height(node.left), self._get_height(node.right))
+        balance = self._get_balance(node)
+
+        # AVL Balancing
+        if balance > 1 and key < node.left.key:
+            return self._rotate_right(node)
+        if balance < -1 and key > node.right.key:
+            return self._rotate_left(node)
+        if balance > 1 and key > node.left.key:
+            node.left = self._rotate_left(node.left)
+            return self._rotate_right(node)
+        if balance < -1 and key < node.right.key:
+            node.right = self._rotate_right(node.right)
+            return self._rotate_left(node)
+
+        return node
 
     def search(self, key):
         return self._search_recursive(self.root, key)
@@ -97,9 +127,9 @@ class LoanBST:
             elif not node.right:
                 return node.left
             temp = self._min_value_node(node.right)
-            node.key = temp.key
-            node.value = temp.value
+            node.key, node.value = temp.key, temp.value
             node.right = self._delete_recursive(node.right, temp.key)
+        node.height = 1 + max(self._get_height(node.left), self._get_height(node.right))
         return node
 
     def _min_value_node(self, node):
