@@ -65,6 +65,7 @@ class HashTable:
         self.table = [LinkedListForHash() for _ in range(capacity)]
 
     def _hash_function(self, key):
+        key = str(key)  # Ensure key is a string
         hash_value = 0
         for char in key:
             hash_value = (hash_value * 31 + ord(char)) % self.capacity
@@ -167,7 +168,7 @@ def create_book_tab(notebook, conn):
         for i in range(book_table.capacity):
             book_table.table[i] = LinkedListForHash()
         book_table.size = 0
-
+        cur = conn.cursor()
         # Truy vấn lại dữ liệu từ SQLite và chèn vào bảng băm
         for row in cursor.execute("SELECT * FROM books"):
             book = Book(*row[:6])
@@ -210,12 +211,21 @@ def create_book_tab(notebook, conn):
         if not selected:
             messagebox.showerror("Lỗi", "Vui lòng chọn sách để xóa.")
             return
-        isbn = tree.item(selected[0])["values"][0]
+        isbn = str(tree.item(selected[0])["values"][0])
+         # Duyệt toàn bộ bảng loans để kiểm tra sách đang được mượn
+        cursor.execute("SELECT * FROM loans")
+        loan_rows = cursor.fetchall()
+        for row in loan_rows:
+            loan_isbn = str(row[2])      # cột thứ 3 là isbn
+            loan_status = str(row[6])    # cột thứ 7 là status
+            if loan_isbn == isbn and loan_status == "Đang mượn":
+                messagebox.showwarning("Không thể xóa", "Sách này hiện đang được mượn và không thể xóa.")
+            return
         if book_table.search(isbn):
             book_table.delete(isbn)
         cursor.execute("DELETE FROM books WHERE isbn = ?", (isbn,))
         conn.commit()
-        refresh_tree()
+        reload_from_database()
         messagebox.showinfo("Thành công", "Đã xóa sách")
 
     def update_book():
