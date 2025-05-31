@@ -482,8 +482,27 @@ def create_loan_tab(notebook, loan_manager):
 
     def show_statistics():
         display_loan_counts(loan_manager.count_loans_by_isbn())
+    original_columns = columns  # columns = ("loan_id", "reader_id", ..., "status")
+    original_column_config = {
+    "loan_id": {"text": "ID", "width": 50, "anchor": "center"},
+    "reader_id": {"text": "Mã bạn đọc", "width": 100},
+    "reader_name": {"text": "Tên bạn đọc", "width": 150},
+    "isbn": {"text": "ISBN", "width": 120},
+    "book_title": {"text": "Tên sách", "width": 200},
+    "borrow_date": {"text": "Ngày mượn", "width": 100},
+    "due_date": {"text": "Hạn trả", "width": 100},
+    "return_date": {"text": "Ngày trả", "width": 100},
+    "status": {"text": "Trạng thái", "width": 100},
+}
+    def reset_treeview_columns():
+        tree["columns"] = original_columns
+        for col in original_columns:
+            cfg = original_column_config[col]
+            tree.heading(col, text=cfg["text"])
+            tree.column(col, width=cfg.get("width", 100), anchor=cfg.get("anchor", "w"))
 
     def show_all():
+        reset_treeview_columns()  # Reset lại cấu hình cột
         display_loans(loan_manager.get_all_loans())
 
     # Các nút chức năng
@@ -498,6 +517,6 @@ def create_loan_tab(notebook, loan_manager):
     ttk.Button(button_frame, text="Sách đang mượn", command=show_current_loans).grid(row=1, column=2, padx=2)
     ttk.Button(button_frame, text="Sách quá hạn", command=show_overdue).grid(row=2, column=0, padx=2)
     ttk.Button(button_frame, text="Thống kê mượn theo ISBN", command=show_statistics).grid(row=2, column=1, padx=2)
-    ttk.Button(button_frame, text="Xem tất cả", command=show_all).grid(row=2, column=2, padx=2)
+    ttk.Button(button_frame, text="Reset dữ liệu", command=show_all).grid(row=2, column=2, padx=2)
 
     show_all()
