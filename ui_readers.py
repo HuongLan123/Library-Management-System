@@ -66,6 +66,7 @@ class HashTable:
         self.table = [LinkedListForHash() for _ in range(capacity)]
 
     def _hash_function(self, key):
+        key = str(key)  # Ensure key is a string
         hash_value = 0
         for char in key:
             hash_value = (hash_value * 31 + ord(char)) % self.capacity
@@ -193,8 +194,15 @@ def create_reader_tab(notebook, conn):
         if not selected:
             messagebox.showerror("Lỗi", "Vui lòng chọn bạn đọc để xóa.")
             return
-        reader_id = tree.item(selected[0])["values"][0]
-        
+        reader_id = str(tree.item(selected[0])["values"][0])
+        cursor.execute("SELECT * FROM loans")
+        loan_rows = cursor.fetchall()
+        for row in loan_rows:
+            loan_reader_id = str(row[1])      # cột thứ 3 là isbn
+            loan_status = str(row[6])    # cột thứ 7 là status
+            if loan_reader_id == reader_id and loan_status == "Đang mượn":
+                messagebox.showwarning("Không thể xóa", "Sách này hiện đang được mượn và không thể xóa.")
+            return
         if reader_table.search(reader_id):
             reader_table.delete(reader_id)
             cursor.execute("DELETE FROM readers WHERE reader_id = ?", (reader_id,))
