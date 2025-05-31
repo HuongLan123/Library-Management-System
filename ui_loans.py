@@ -445,15 +445,28 @@ def create_loan_tab(notebook, loan_manager):
             messagebox.showerror("Lỗi", "ID phiếu mượn không hợp lệ.")
 
     def delete_loan():
-        try:
-            loan_id = int(loan_id_entry.get().strip())
-            if loan_manager.delete_loan(loan_id):
-                messagebox.showinfo("Thành công", "Đã xoá phiếu mượn.")
-                display_loans(loan_manager.get_all_loans()) # Refresh list after successful deletion
-            else:
-                messagebox.showerror("Lỗi", "Không thể xoá phiếu mượn. Chỉ có thể xoá phiếu đã trả.")
-        except ValueError:
-            messagebox.showerror("Lỗi", "ID phiếu mượn không hợp lệ.")
+        selected = tree.selection()
+        if selected:
+            try:
+            # Lấy loan_id từ dòng đang chọn trên TreeView
+                loan_id = int(tree.item(selected[0])["values"][0])
+            except (IndexError, ValueError):
+                messagebox.showerror("Lỗi", "Không thể đọc ID phiếu mượn từ bảng.")
+                return
+        else:
+            # Nếu không chọn dòng nào, lấy từ ô nhập liệu
+            try:
+                loan_id = int(loan_id_entry.get().strip())
+            except ValueError:
+                messagebox.showerror("Lỗi", "ID phiếu mượn không hợp lệ.")
+                return
+        # Gọi hàm xóa
+        if loan_manager.delete_loan(loan_id):
+            messagebox.showinfo("Thành công", "Đã xoá phiếu mượn.")
+            display_loans(loan_manager.get_all_loans()) # Refresh list after successful deletion
+        else:
+            messagebox.showerror("Lỗi", "Không thể xoá phiếu mượn. Chỉ có thể xoá phiếu đã trả.")
+
 
     def search_by_reader():
         display_loans(loan_manager.get_loan_history_by_reader(reader_id_entry.get().strip()))
