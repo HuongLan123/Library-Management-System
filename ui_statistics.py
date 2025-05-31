@@ -7,6 +7,7 @@ db_connection = sqlite3.connect("library4.db") # Kết nối CSDL SQLite
 # IMPORT CÁC LỚP CTDL TỰ CÀI ĐẶT VÀ ĐỐI TƯỢNG
 # ==============================================================================
 try:
+    from ui_books import HashTable
     from ui_books import HashTable as BookHashTable, Book 
 
     from ui_readers import Reader 
@@ -50,26 +51,33 @@ def self_implemented_merge_sort(data_list, key_func=None, reverse=False):
 
 
 def self_implemented_count_frequencies(list_of_objects, attribute_name_to_count):
-    """Đếm tần suất của một thuộc tính trong danh sách đối tượng."""
-    frequency_map_list = [] # List các tuple (giá trị thuộc tính, số lần đếm)
-    if not list_of_objects:
-        return frequency_map_list
-    for obj_item in list_of_objects:
+    """
+    Đếm tần suất của thuộc tính bất kỳ từ danh sách đối tượng,
+    sử dụng HashTable đã định nghĩa sẵn.
+    Trả về danh sách tuple (key, count)
+    """
+    frequency_table = HashTable()
+    
+    for obj in list_of_objects:
         try:
-            key_to_count = getattr(obj_item, attribute_name_to_count)
+            key = getattr(obj, attribute_name_to_count)
         except AttributeError:
-            print(f"Cảnh báo (Đếm tần suất): Đối tượng {type(obj_item)} không có thuộc tính '{attribute_name_to_count}'.")
+            print(f"Cảnh báo: Không có thuộc tính '{attribute_name_to_count}'")
             continue
-        found_in_map = False
-        for i, entry in enumerate(frequency_map_list):
-            if entry[0] == key_to_count:
-                frequency_map_list[i] = (entry[0], entry[1] + 1)
-                found_in_map = True
-                break
-        if not found_in_map:
-            frequency_map_list.append((key_to_count, 1))
-    return frequency_map_list
 
+        current_count = frequency_table.search(key)
+        if current_count is None:
+            frequency_table.insert(key, 1)
+        else:
+            frequency_table.insert(key, current_count + 1)
+    
+    # Trả kết quả dưới dạng danh sách tuple
+    result = []
+    for bucket in frequency_table.table:
+        for key, value in bucket.get_all_key_value_pairs():
+            result.append((key, value))
+    
+    return result
 # ==============================================================================
 # UI MODULE 4 - BÁO CÁO & THỐNG KÊ
 # ==============================================================================
@@ -239,11 +247,18 @@ def create_statistics_tab(notebook, db_connection):
              return
         num_titles = ht_books_stats.size
         all_book_objects = ht_books_stats.get_all_values()
-        total_copies = sum(book.quantity for book in all_book_objects if book) if all_book_objects else 0
+        # Tính tổng số lượng sách (total quantity)
+        total_copies = 0
+        total_available = 0
+        if all_book_objects:
+            for book in all_book_objects:
+                if book:
+                    total_copies += book.quantity
+                    total_available += book.available_quantity
         output_text_area.insert(tk.END, "--- Thống Kê Tổng Số Sách ---\n")
         output_text_area.insert(tk.END, f"Tổng số đầu sách trong thư viện: {num_titles}\n")
         output_text_area.insert(tk.END, f"Tổng số cuốn sách trong thư viện: {total_copies}\n")
-
+        output_text_area.insert(tk.END, f"Tổng số cuốn sách hiện còn trong thư viện: {total_available}\n")
     def display_total_readers_stats_command():
         clear_output_area_command()
         if ht_readers_stats.size== 0:
