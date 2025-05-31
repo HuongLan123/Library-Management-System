@@ -201,7 +201,7 @@ class LoanManager:
                 return True
         return False
 
-    def add_loan(self, reader_id, isbn):
+    def add_loan(self, reader_id, isbn, duedays):
         # Tải lại dữ liệu để đảm bảo BST có trạng thái mới nhất từ DB
         # (quan trọng vì các thao tác ở các tab khác có thể thay đổi DB)
         self._load_loans_from_db() 
@@ -224,7 +224,7 @@ class LoanManager:
         if result and result[0] > 0:
             loan_id = self._get_next_loan_id()
             borrow_date = datetime.now()
-            due_date = borrow_date + timedelta(days=14)
+            due_date = borrow_date + timedelta(days=duedays)
 
             # Lấy tên sách và tên bạn đọc ngay khi tạo phiếu mượn
             self.cursor.execute("SELECT title FROM books WHERE isbn = ?", (isbn,))
@@ -329,7 +329,11 @@ def create_loan_tab(notebook, loan_manager):
     tk.Label(input_frame, text="ID Phiếu Mượn:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
     loan_id_entry = tk.Entry(input_frame)
     loan_id_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+    tk.Label(input_frame, text="Số ngày mượn:").grid(row=3, column=0, padx=5, pady=5, sticky="w")
 
+# Ô nhập số ngày mượn
+    duedays_entry = tk.Entry(input_frame)
+    duedays_entry.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
     # Khung hiển thị kết quả
     output_frame = ttk.LabelFrame(tab, text="Kết quả")
     output_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
@@ -429,7 +433,9 @@ def create_loan_tab(notebook, loan_manager):
         # Đảm bảo các giá trị được strip để tránh khoảng trắng
         reader_id = reader_id_entry.get().strip()
         isbn = isbn_entry.get().strip()
-        if loan_manager.add_loan(reader_id, isbn):
+        value = duedays_entry.get().strip()
+        duedays = int(value) if value else 30
+        if loan_manager.add_loan(reader_id, isbn,duedays):
             # Sau khi thêm thành công, cần cập nhật lại Treeview
             display_loans(loan_manager.get_all_loans())
 
