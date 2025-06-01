@@ -220,7 +220,7 @@ def create_book_tab(notebook, conn):
             loan_status = str(row[6])    # cột thứ 7 là status
             if loan_isbn == isbn and loan_status == "Đang mượn":
                 messagebox.showwarning("Không thể xóa", "Sách này hiện đang được mượn và không thể xóa.")
-            return
+                return
         if book_table.search(isbn):
             book_table.delete(isbn)
         cursor.execute("DELETE FROM books WHERE isbn = ?", (isbn,))
@@ -287,7 +287,7 @@ def create_book_tab(notebook, conn):
         for book in result:
             tree.insert("", "end", values=(book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity))
 
-    def sort_books(table):
+    def sort_books(table,tree):
         books = table.get_all_values()
         mode = sort_type.get()
         reverse = False
@@ -316,22 +316,22 @@ def create_book_tab(notebook, conn):
             result = []
             i = j = 0
             while i < len(left) and j < len(right):
-                if (key_func(left[i]) <= key_func(right[j])) ^ reverse:
+                if (key_func(left[i]) <= key_func(right[j]) and not reverse) or \
+           (key_func(left[i]) > key_func(right[j]) and reverse):
                     result.append(left[i])
+                    i += 1
                 else:
                     result.append(right[j])
-                i += 1
-                j += 1
+                    j += 1
             result.extend(left[i:])
             result.extend(right[j:])
             return result
-
+            return result
         sorted_books = merge_sort(books)
+        print(sorted_books)
         tree.delete(*tree.get_children())
         for book in sorted_books:
-            tree.insert("", "end", values=(book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity))
-
-
+            tree.insert("", "end", values=(book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity))       
     def export_to_csv():
         with open("books_export.csv", "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -363,7 +363,7 @@ def create_book_tab(notebook, conn):
     sort_type = ttk.Combobox(tab, values=["Tiêu đề (A-Z)", "Tiêu đề (Z-A)", "ISBN (tăng dần)", "ISBN (giảm dần)"])
     sort_type.set("Tiêu đề (A-Z)")
     sort_type.grid(row=14, column=1, pady=5, sticky="ew")
-    tk.Button(tab, text="Sắp xếp", bg="white", command=lambda: sort_books(book_table)).grid(row=15, column=0, pady=5, sticky="ew", columnspan=2)
+    tk.Button(tab, text="Sắp xếp", bg="white", command=lambda: sort_books(book_table,tree)).grid(row=15, column=0, pady=5, sticky="ew", columnspan=2)
 
 
     tree.bind("<ButtonRelease-1>", load_selected_book)
