@@ -180,9 +180,15 @@ class LoanManager:
             self.loans.insert(loan)
 
     def _get_next_loan_id(self):
-        self.cursor.execute("SELECT MAX(loan_id) FROM loans")
-        max_id = self.cursor.fetchone()[0]
-        return (max_id if max_id else 0) + 1
+        self.cursor.execute("SELECT loan_id FROM loans")
+        rows = self.cursor.fetchall()
+        max_id = 0
+        for row in rows:
+            loan_id = row[0]
+            if loan_id > max_id:
+                max_id = loan_id
+        return max_id + 1
+
 
     def _reader_exists(self, reader_id):
         self.cursor.execute("SELECT 1 FROM readers WHERE reader_id = ?", (reader_id,))
