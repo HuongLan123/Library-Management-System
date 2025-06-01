@@ -131,9 +131,9 @@ Cửa sổ giao diện sẽ hiển thị với các tab:
 
 * Tạo phiếu mượn: Nhập Mã bạn đọc + ISBN → Nhấn **Tạo phiếu mượn**
 * Trả sách: Nhập ID phiếu mượn → Nhấn **Trả sách**
-* Xem lịch sử phiếu: Nhập mã bạn đọc hoặc ISBN → Nhấn **Lịch sử**
+* Xem lịch sử phiếu: Nhấn Reset dữ liệu → Nhập mã bạn đọc hoặc ISBN → Nhấn **Lịch sử**
 * Xóa phiếu đã trả: Chọn phiếu → Nhấn **Xóa**
-* Thống kê lượt mượn theo sách: Nhấn **Thống kê sách mượn**
+* Thống kê lượt mượn theo sách: Nhấn Reset dữ liệu → Nhấn **Thống kê sách mượn**
 
 ### 📊 Tab "Thống kê"
 
