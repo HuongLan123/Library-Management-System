@@ -128,7 +128,7 @@ def create_book_tab(notebook, conn):
         book.available_quantity = row[6]
         book_table.insert(book.isbn, book)
 
-    labels = ["ISBN", "Tiêu đề", "Thể loại","Tác giả", "Năm", "Số lượng"]
+    labels = ["ISBN", "Tiêu đề", "Thể loại","Tác giả", "Năm xuất bản", "Số lượng"]
     entries = {}
     for i, label in enumerate(labels):
         tk.Label(tab, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="e")
@@ -143,7 +143,7 @@ def create_book_tab(notebook, conn):
             entries["Thể loại"] = genre_combobox
 
 
-    tree = ttk.Treeview(tab, columns=("ISBN", "Tiêu đề","Thể loại", "Tác giả", "Năm", "SL", "Còn"), show="headings")
+    tree = ttk.Treeview(tab, columns=("ISBN", "Tiêu đề","Thể loại", "Tác giả", "Năm xuất bản", "SL", "Còn"), show="headings")
     for col in tree["columns"]:
         tree.heading(col, text=col, anchor="center")
         # Set a minimum width for columns to prevent them from becoming too narrow
@@ -189,10 +189,10 @@ def create_book_tab(notebook, conn):
         genre = entries["Thể loại"].get().strip() or "Khác"
         author = entries["Tác giả"].get().strip()
         try:
-            year = int(entries["Năm"].get().strip())
+            year = int(entries["Năm xuất bản"].get().strip())
             quantity = int(entries["Số lượng"].get().strip())
         except ValueError:
-            messagebox.showerror("Lỗi", "Năm và Số lượng phải là số nguyên")
+            messagebox.showerror("Lỗi", "Năm xuất bản và Số lượng phải là số nguyên")
             return
 
         if book_table.search(isbn):
@@ -238,10 +238,10 @@ def create_book_tab(notebook, conn):
         title = entries["Tiêu đề"].get().strip()
         author = entries["Tác giả"].get().strip()
         try:
-            year = int(entries["Năm"].get().strip())
+            year = int(entries["Năm xuất bản"].get().strip())
             quantity = int(entries["Số lượng"].get().strip())
         except ValueError:
-            messagebox.showerror("Lỗi", "Năm và Số lượng phải là số")
+            messagebox.showerror("Lỗi", "Năm xuất bản và Số lượng phải là số")
             return
         book = book_table.search(isbn)
         if not book:
@@ -335,7 +335,7 @@ def create_book_tab(notebook, conn):
     def export_to_csv():
         with open("books_export.csv", "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["ISBN", "Tiêu đề", "Tác giả", "Năm", "Số lượng", "Còn lại"])
+            writer.writerow(["ISBN", "Tiêu đề", "Tác giả", "Năm xuất bản", "Số lượng", "Còn lại"])
             for book in book_table.get_all_values():
                 writer.writerow([book.isbn, book.title, book.genre, book.author, book.year, book.quantity, book.available_quantity])
         messagebox.showinfo("Xuất CSV", "Đã lưu file books_export.csv")
