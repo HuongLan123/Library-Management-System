@@ -112,7 +112,7 @@ Cửa sổ giao diện sẽ hiển thị với các tab:
 
 ### 📚 Tab "Quản lý Sách"
 
-* Thêm sách: Nhập thông tin → Nhấn **Thêm**
+* Thêm sách: Xóa thông tin trên dòng nhập → Nhập thông tin → Nhấn **Thêm**
 * Xóa sách: Chọn sách → Nhấn **Xóa** (không xóa được nếu đang được mượn)
 * Cập nhật: Chọn sách trên bảng giao diện → Sửa thông tin → Nhấn **Cập nhật**
 * Xuất CSV: Lưu danh sách thành `books_export.csv`
