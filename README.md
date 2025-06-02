@@ -55,6 +55,7 @@ project/
 
 * Python >= 3.8
 * Hệ điều hành: Windows / macOS / Linux (Ubuntu/Debian...)
+* DB Browser SQLite3 (nếu muốn xem CSDL được lưu trữ)
 
 ### ✅ Cài đặt thư viện:
 
@@ -169,6 +170,7 @@ Search 1000 readers in HashTable      | Time: 0.0021 s | Peak Mem: 6.2 KB
 ## ✅ Ghi chú
 
 * CSDL `library4.db` được tạo tự động sau lần chạy đầu tiên
+* Có thể tự tạo 'library4.db' trước khi chạy và thêm dữ liệu trực tiếp trên DB Browser SQLite
 * Không thể xóa sách/bạn đọc nếu có phiếu mượn chưa trả
 * Giao diện hỗ trợ Unicode và tiếng Việt đầy đủ
 
